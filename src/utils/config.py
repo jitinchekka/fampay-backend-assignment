@@ -5,11 +5,6 @@ b = load_dotenv()
 print("Loading environment variables...")
 if b:
     print("Environment variables loaded successfully.")
-    # print .env file path
-    print(f"Path to .env file: {os.getenv('DOTENV_PATH')}")
-#    print all the environment variables
-    for key in os.environ:
-        print(f"{key}={os.getenv(key)}")
 else:
     print("Failed to load environment variables.")
 

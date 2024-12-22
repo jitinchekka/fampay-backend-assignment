@@ -6,3 +6,7 @@ db.sqlite3
 env/
 venv/
 dump.rdb
+*.pyc
+*.pyo
+*.pyd
+.cpython-*
