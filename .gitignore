@@ -1,48 +1,7 @@
-    __pycache__/
-    *.py[cod]
-    *$py.class
-
-    *.so
-
-    build/
-    dist/
-    .eggs/
-    *.egg-info
-    *.egg
-    MANIFEST
-
-    *.spec
-
-    *.log
-    local_settings.py
-    db.sqlite3
-
-    instance/
-
-    .scrapy
-
-    docs/_build/
-
-    target/
-
-    profile_default/
-    ipython_config.py
-
-    __pypackages__/
-
-    .env
-    .venv
-    env/
-    venv/
-
-    /site
-
-    .mypy_cache/
-
-    .pyre/
-
-    .pytype/
-
-    cython_debug/
-
-    dump.rdb
+.env
+dump.rdb
+__pycache__/
+*.pyc
+db.sqlite3
+env/
+venv/
