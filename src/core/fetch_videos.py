@@ -124,6 +124,7 @@ def fetch_videos_from_youtube(published_after_date):
 
 
 def process_youtube_response(response, db):
+    video_objects = []
     last_video_id = None
     for search_result in response.get("items", []):
         video_data = Video(
@@ -133,16 +134,18 @@ def process_youtube_response(response, db):
             published_at=datetime.strptime(
                 search_result["snippet"]["publishedAt"], ISO_DATE_FORMAT
             ),
-            thumbnails=str(search_result["snippet"]
-                           ["thumbnails"]["high"]["url"]),
+            thumbnails=str(search_result["snippet"]["thumbnails"]["high"]["url"]),
         )
-        try:
-            db.add(video_data)
-            print(f"Video: {search_result['snippet']['title']}")
-            last_video_id = video_data.video_id
-        except Exception as e:
-            print(f"An error occurred: {str(e)}")
+        video_objects.append(video_data)
+        last_video_id = video_data.video_id
+
+    try:
+        db.bulk_save_objects(video_objects)  # Bulk insertion
+        print(f"Inserted {len(video_objects)} videos.")
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
     return last_video_id
+
 
 
 def fetch_videos_from_invidious(published_after_date):
