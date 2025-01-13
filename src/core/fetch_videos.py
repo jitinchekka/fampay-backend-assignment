@@ -6,6 +6,7 @@ from datetime import datetime
 from database import get_db
 import redis
 import logging
+from sqlalchemy.dialects.sqlite import insert
 
 ISO_DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 YOUTUBE_API_SERVICE_NAME = "youtube"
@@ -23,12 +24,15 @@ try:
 except:
     print("Unable to connect to redis")
 
+
 def get_currenttime():
     return datetime.now().strftime(ISO_DATE_FORMAT)
+
 
 def get_last_fetch_info():
     with next(get_db()) as db:
         return db.query(FetchHistory).order_by(FetchHistory.last_fetch_time.desc()).first()
+
 
 def update_fetch_history(db, last_video_id, last_fetch_time):
     fetch_history = FetchHistory(
@@ -37,26 +41,38 @@ def update_fetch_history(db, last_video_id, last_fetch_time):
     )
     db.add(fetch_history)
 
+
 def process_youtube_response(response, db):
-    video_objects = []
+    videos_to_insert = []
     last_video_id = None
-    
+
     for search_result in response.get("items", []):
-        video_data = Video(
+        video = Video(
             video_id=search_result["id"]["videoId"],
             title=search_result["snippet"]["title"],
             description=search_result["snippet"]["description"],
             published_at=datetime.strptime(
                 search_result["snippet"]["publishedAt"], ISO_DATE_FORMAT
             ),
-            thumbnails=str(search_result["snippet"]["thumbnails"]["high"]["url"]),
+            thumbnails=str(search_result["snippet"]
+                           ["thumbnails"]["high"]["url"]),
         )
-        video_objects.append(video_data)
-        last_video_id = video_data.video_id
+        videos_to_insert.append(video.__dict__)
+        last_video_id = video.video_id
 
-    db.bulk_save_objects(video_objects)  # Bulk insertion
-    logger.info(f"Prepared {len(video_objects)} videos for insertion.")
+    for video_dict in videos_to_insert:
+        video_dict.pop('_sa_instance_state', None)
+
+    if videos_to_insert:
+        stmt = insert(Video).values(videos_to_insert)
+        stmt = stmt.on_conflict_do_nothing(index_elements=['video_id'])
+
+        result = db.execute(stmt)
+        logger.info(f"Processed {len(videos_to_insert)} videos, inserted {
+                    result.rowcount} new videos.")
+
     return last_video_id
+
 
 def fetch_videos_from_youtube(published_after_date):
     keys_to_skip = {}
@@ -82,7 +98,8 @@ def fetch_videos_from_youtube(published_after_date):
                     part="snippet",
                     maxResults=50,
                     order="date",
-                    publishedAfter=published_after_date.strftime(ISO_DATE_FORMAT),
+                    publishedAfter=published_after_date.strftime(
+                        ISO_DATE_FORMAT),
                 )
                 .execute()
             )
@@ -90,21 +107,24 @@ def fetch_videos_from_youtube(published_after_date):
             # Handle all database operations in a single transaction
             with next(get_db()) as db:
                 try:
-                    last_video_id = process_youtube_response(search_response, db)
+                    last_video_id = process_youtube_response(
+                        search_response, db)
                     current_time = get_currenttime()
                     update_fetch_history(db, last_video_id, current_time)
-                    
+
                     # Commit everything in one transaction
                     db.commit()
-                    logger.info(f"Successfully committed videos and fetch history.")
-                    
+                    logger.info(
+                        f"Successfully committed videos and fetch history.")
+
                     # Update Redis after successful commit
                     if redis_working:
                         redis_client.set("last_successful_fetch", current_time)
-                    
+
                 except Exception as e:
                     db.rollback()
-                    logger.error(f"Database transaction failed: {str(e)}", exc_info=True)
+                    logger.error(f"Database transaction failed: {
+                                 str(e)}", exc_info=True)
                     raise
 
             logger.info(f"Successful fetch from YouTube API: {key}")
@@ -123,6 +143,7 @@ def fetch_videos_from_youtube(published_after_date):
 
         key_index = (key_index + 1) % len(config.GOOGLE_API_KEYS)
 
+
 def pullYoutubeVideos():
     '''
     This function fetches videos from YouTube APIs.
@@ -138,7 +159,7 @@ def pullYoutubeVideos():
             if last_successful_fetch
             else last_fetch_info.last_fetch_time
             if last_fetch_info
-            else datetime(2024, 12, 21)
+            else datetime(2025, 1, 12)
         )
 
         fetch_videos_from_youtube(published_after_date)
